@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f695e81afbe29d7cde42357311330ee036620485bb2fddee2b4d2b15d3ab04d2
+-- hash: 804dd5468aaec5e72631154053ecd862381bcee2b42160ddd684da56cfdb6c31
 
 name:           normalizer
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/normalizer#readme>
-homepage:       https://github.com/githubuser/normalizer#readme
-bug-reports:    https://github.com/githubuser/normalizer/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2021 Author name here
+homepage:       https://github.com/justus-wendroth/normalizer#readme
+bug-reports:    https://github.com/justus-wendroth/normalizer/issues
+author:         Justus Wendroth
+maintainer:     justus.wendroth@outlook.de
+copyright:      2021 Justus Wendroth
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/normalizer
+  location: https://github.com/justus-wendroth/normalizer
 
 library
   exposed-modules:

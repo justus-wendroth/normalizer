@@ -1,10 +1,10 @@
 name:                normalizer
 version:             0.1.0.0
-github:              "githubuser/normalizer"
+github:              "justus-wendroth/normalizer"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2021 Author name here"
+author:              "Justus Wendroth"
+maintainer:          "justus.wendroth@outlook.de"
+copyright:           "2021 Justus Wendroth"
 
 extra-source-files:
 - README.md
