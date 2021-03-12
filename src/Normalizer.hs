@@ -77,8 +77,6 @@ isCandidateKey key r = isKey key r && not (any predicate (subsequences key))
 isKey :: String -> Relation -> Bool
 isKey xs (attrs, fds) = setEqual attrs (closure xs fds)
 
--- Normal Forms
-
 isIn1NF :: Relation -> Bool
 isIn1NF _ = True
 
@@ -86,7 +84,7 @@ isIn1NF _ = True
 isIn2NF :: Relation -> Bool
 isIn2NF r@(attrs, fds) = isIn1NF r
 
--- Check for all FDs alpha -> beta (but only fds):
+-- Check for all FDs alpha -> B (but only fds):
 -- 1. Is trivial
 -- 2. Is key
 -- 3. beta only contains key attrs
@@ -123,6 +121,7 @@ isTrivialMVD d (attrs, _) = alpha d `subset` beta d || setEqual (filter (`notEle
 isKeyAttribute :: Char -> Relation -> Bool
 isKeyAttribute x r = x `elem` concat (getKeys r)
 
+-- TODO
 synthesisAlgorithm :: Relation -> [Relation]
 synthesisAlgorithm = undefined
 
@@ -147,13 +146,16 @@ uniteFDs r@(attrs, fds) = (attrs, go fds)
       recursiveCall = go fds 
       in if null uniteable then fd : recursiveCall else FD xs (ys ++ concat uniteable) : notUniteable
 
+-- TODO
 leftReduction :: Relation -> Relation
 leftReduction (attrs, []) = (attrs, [])
 leftReduction (attrs, FD xs ys : fds) = undefined 
 leftReduction (attrs, MVD xs ys : fds) = undefined 
 
+-- TODO
 rightReduction :: Relation -> Relation
 rightReduction = undefined
 
+-- TODO
 decompositionAlgorithm :: Relation -> [Relation]
 decompositionAlgorithm = undefined
