@@ -148,29 +148,37 @@ uniteFDs r@(attrs, fds) = (attrs, go fds)
         recursiveCall = go fds 
       in if null uniteable then fd : recursiveCall else FD xs (ys ++ concat uniteable) : notUniteable
 
--- TODO
 leftReduction :: Relation -> Relation
 leftReduction (attrs, fds) = (attrs, go [] fds)
   where
     go acc [] = acc
-    go acc (d@(FD xs ys) : fds) = let updatedFD = FD (reduce xs ys [] (acc ++ fds)) ys in go (updatedFD : acc) fds
+    go acc (d@(FD xs ys) : fds) = go (leftReduceFD d (acc ++ fds) : acc) fds
     go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
-    reduce [] ys acc fds = acc
-    reduce (x:xs) ys acc fds
-      | ys `subset` closure (acc ++ xs) (FD (acc ++ (x:xs)) ys : fds) = reduce xs ys acc fds
-      | otherwise = reduce xs ys (x : acc) fds
 
--- TODO
+leftReduceFD :: Dependency -> [Dependency] -> Dependency 
+leftReduceFD (MVD _ _) _ = undefined
+leftReduceFD (FD xs ys) fds = FD (go xs []) ys
+  where
+    go [] acc = acc
+    go (x:xs) acc
+      | ys `subset` closure (acc ++ xs) (FD (acc ++ (x:xs)) ys : fds) = go xs acc
+      | otherwise = go xs (x : acc)
+
 rightReduction :: Relation -> Relation
 rightReduction (attrs, fds) = (attrs, go [] fds)
   where
     go acc [] = acc
-    go acc (d@(FD xs ys) : fds) = let updatedFD = FD xs (reduce xs ys [] (acc ++ fds)) in go (updatedFD : acc) fds
+    go acc (d@(FD xs ys) : fds) = go (rightReduceFD d (acc ++ fds) : acc) fds
     go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
-    reduce xs [] acc fds = acc
-    reduce xs (y:ys) acc fds
-      | y `elem` closure xs (FD xs (acc ++ ys) : fds) = reduce xs ys acc fds
-      | otherwise = reduce xs ys (y : acc) fds
+
+rightReduceFD :: Dependency -> [Dependency] -> Dependency
+rightReduceFD (MVD _ _) _ = undefined
+rightReduceFD (FD xs ys) fds = FD xs (go ys []) 
+  where
+    go [] acc = acc
+    go (y:ys) acc
+      | y `elem` closure xs (FD xs (acc ++ ys) : fds) = go ys acc
+      | otherwise = go ys (y : acc)
 
 -- TODO
 decompositionAlgorithm :: Relation -> [Relation]
