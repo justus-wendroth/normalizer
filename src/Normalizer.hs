@@ -1,6 +1,8 @@
 module Normalizer where
 
 import Data.List (nub, subsequences, (\\), sort, insert)
+import Debug.Trace (trace)
+
 
 data Dependency = FD {alpha :: String, beta :: String} | MVD {alpha :: String, beta :: String}
 type Relation = ([Char], [Dependency])
@@ -129,8 +131,8 @@ canonicalCover :: Relation -> Relation
 canonicalCover = uniteFDs . removeEmptyFDs . rightReduction . leftReduction
   where
     removeEmptyFDs (attrs, fds) = (attrs, filter predicate fds)
-    predicate (FD xs []) = False
-    predicate fd = True
+    predicate (FD _ []) = False
+    predicate _ = True
 
 uniteFDs :: Relation -> Relation
 uniteFDs r@(attrs, fds) = (attrs, go fds)
@@ -139,22 +141,36 @@ uniteFDs r@(attrs, fds) = (attrs, go fds)
     go (mvd@(MVD _ _) : fds) = mvd : go fds
     go (fd@(FD xs ys) : fds) = 
       let
-      notUniteable = filter (not . predicate xs) recursiveCall
-      uniteable = map beta $ filter (predicate xs) recursiveCall
-      predicate as (FD bs cs) = setEqual as bs 
-      predicate _ (MVD bs cs) = False 
-      recursiveCall = go fds 
+        notUniteable = filter (not . predicate xs) recursiveCall
+        uniteable = map beta $ filter (predicate xs) recursiveCall
+        predicate as (FD bs cs) = setEqual as bs 
+        predicate _ (MVD bs cs) = False 
+        recursiveCall = go fds 
       in if null uniteable then fd : recursiveCall else FD xs (ys ++ concat uniteable) : notUniteable
 
 -- TODO
 leftReduction :: Relation -> Relation
-leftReduction (attrs, []) = (attrs, [])
-leftReduction (attrs, FD xs ys : fds) = undefined 
-leftReduction (attrs, MVD xs ys : fds) = undefined 
+leftReduction (attrs, fds) = (attrs, go [] fds)
+  where
+    go acc [] = acc
+    go acc (d@(FD xs ys) : fds) = let updatedFD = FD (reduce xs ys [] (acc ++ fds)) ys in go (updatedFD : acc) fds
+    go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
+    reduce [] ys acc fds = acc
+    reduce (x:xs) ys acc fds
+      | ys `subset` closure (acc ++ xs) (FD (acc ++ (x:xs)) ys : fds) = reduce xs ys acc fds
+      | otherwise = reduce xs ys (x : acc) fds
 
 -- TODO
 rightReduction :: Relation -> Relation
-rightReduction = undefined
+rightReduction (attrs, fds) = (attrs, go [] fds)
+  where
+    go acc [] = acc
+    go acc (d@(FD xs ys) : fds) = let updatedFD = FD xs (reduce xs ys [] (acc ++ fds)) in go (updatedFD : acc) fds
+    go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
+    reduce xs [] acc fds = acc
+    reduce xs (y:ys) acc fds
+      | y `elem` closure xs (FD xs (acc ++ ys) : fds) = reduce xs ys acc fds
+      | otherwise = reduce xs ys (y : acc) fds
 
 -- TODO
 decompositionAlgorithm :: Relation -> [Relation]
