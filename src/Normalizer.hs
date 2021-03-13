@@ -3,7 +3,6 @@ module Normalizer where
 import Data.List (nub, subsequences, (\\), sort, insert)
 import Debug.Trace (trace)
 
-
 data Dependency = FD {alpha :: String, beta :: String} | MVD {alpha :: String, beta :: String}
 type Relation = ([Char], [Dependency])
 
@@ -125,7 +124,29 @@ isKeyAttribute x r = x `elem` concat (getKeys r)
 
 -- TODO
 synthesisAlgorithm :: Relation -> [Relation]
-synthesisAlgorithm = undefined
+synthesisAlgorithm r
+  | any (\(attrs, _) -> any (`subset` attrs) canditateKeys) res = eliminateRedundantSchemas res
+  | otherwise = eliminateRedundantSchemas ((head canditateKeys, []) : res)
+  where
+    canditateKeys = getCandidateKeys r
+    res = splitIntoSchemas $ canonicalCover r
+    eliminateRedundantSchemas [] = []
+    eliminateRedundantSchemas ((xs, ys) : schemas)
+      | any (\(attrs, _) -> xs `subset` attrs) schemas = eliminateRedundantSchemas schemas
+      | otherwise  = (xs, ys) : schemas
+
+splitIntoSchemas :: Relation -> [Relation]
+splitIntoSchemas (_, fds) = map (addFds fds) $ split fds
+  where
+    split [] = []
+    split (fd@(FD xs ys) : fds) = (xs ++ ys, [fd]) : split fds
+
+
+addFds :: [Dependency] -> Relation -> Relation
+addFds [] r = r
+addFds (fd@(FD xs ys) : fds) (attrs', fds')
+  | (xs ++ ys) `subset` attrs' && fd `notElem` fds' = addFds fds (attrs', fd : fds')
+  | otherwise = addFds fds (attrs', fds')
 
 canonicalCover :: Relation -> Relation
 canonicalCover = uniteFDs . removeEmptyFDs . rightReduction . leftReduction
@@ -153,7 +174,7 @@ leftReduction (attrs, fds) = (attrs, go [] fds)
   where
     go acc [] = acc
     go acc (d@(FD xs ys) : fds) = go (leftReduceFD d (acc ++ fds) : acc) fds
-    go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
+    go acc (d@(MVD xs ys) : fds) = go acc fds
 
 leftReduceFD :: Dependency -> [Dependency] -> Dependency 
 leftReduceFD (MVD _ _) _ = undefined
@@ -169,7 +190,7 @@ rightReduction (attrs, fds) = (attrs, go [] fds)
   where
     go acc [] = acc
     go acc (d@(FD xs ys) : fds) = go (rightReduceFD d (acc ++ fds) : acc) fds
-    go acc (d@(MVD xs ys) : fds) = go (d : acc) fds
+    go acc (d@(MVD xs ys) : fds) = go acc fds
 
 rightReduceFD :: Dependency -> [Dependency] -> Dependency
 rightReduceFD (MVD _ _) _ = undefined
