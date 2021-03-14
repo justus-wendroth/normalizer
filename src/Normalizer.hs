@@ -1,9 +1,10 @@
 module Normalizer where
 
-import Data.List (nub, subsequences, (\\), sort, insert)
+import Data.List (insert, nub, sort, subsequences, (\\))
 import Debug.Trace (trace)
 
 data Dependency = FD {alpha :: String, beta :: String} | MVD {alpha :: String, beta :: String}
+
 type Relation = ([Char], [Dependency])
 
 instance Show Dependency where
@@ -40,8 +41,8 @@ deleteDependency d (attrs, fds) = (attrs, filter (/= d) fds)
 
 insertAttribute :: Char -> Relation -> Relation
 insertAttribute x r@(attrs, fds)
-    | x `elem` attrs = r
-    | otherwise = (nub $ x:attrs, fds)
+  | x `elem` attrs = r
+  | otherwise = (nub $ x : attrs, fds)
 
 -- Delete attribute if it is in the relation
 -- Delete all fds where it is on the left side
@@ -90,18 +91,18 @@ isIn2NF r@(attrs, fds) = isIn1NF r
 -- 2. Is key
 -- 3. beta only contains key attrs
 isIn3NF :: Relation -> Bool
-isIn3NF r@(attrs, fds) = isIn2NF r && go fds  
-    where
-        go [] = True
-        go (FD as bs : xs) = (isKey as r || all (\x -> x `elem` as || x `elem` candidateKeyAttributes) bs) && go xs
-        go (MVD as bs : xs) = go xs
-        candidateKeyAttributes = concat $ getCandidateKeys r
+isIn3NF r@(attrs, fds) = isIn2NF r && go fds
+  where
+    go [] = True
+    go (FD as bs : xs) = (isKey as r || all (\x -> x `elem` as || x `elem` candidateKeyAttributes) bs) && go xs
+    go (MVD as bs : xs) = go xs
+    candidateKeyAttributes = concat $ getCandidateKeys r
 
 isInBCNF :: Relation -> Bool
 isInBCNF r@(_, fds) = isIn3NF r && all predicate fds
   where
     predicate fd@(FD xs _) = isTrivialFD fd || isKey xs r
-    predicate (MVD xs ys) = True 
+    predicate (MVD xs ys) = True
 
 isIn4NF :: Relation -> Bool
 isIn4NF r@(_, fds) = isInBCNF r && all predicate fds
@@ -113,7 +114,7 @@ isTrivial fd@(FD xs ys) _ = isTrivialFD fd
 isTrivial mvd@(MVD _ _) r = isTrivialMVD mvd r
 
 isTrivialFD :: Dependency -> Bool
-isTrivialFD (FD xs ys) = ys `subset` xs 
+isTrivialFD (FD xs ys) = ys `subset` xs
 isTrivialFD (MVD xs ys) = undefined
 
 isTrivialMVD :: Dependency -> Relation -> Bool
@@ -122,31 +123,35 @@ isTrivialMVD d (attrs, _) = alpha d `subset` beta d || setEqual (filter (`notEle
 isKeyAttribute :: Char -> Relation -> Bool
 isKeyAttribute x r = x `elem` concat (getKeys r)
 
--- TODO
 synthesisAlgorithm :: Relation -> [Relation]
 synthesisAlgorithm r
-  | any (\(attrs, _) -> any (`subset` attrs) canditateKeys) res = eliminateRedundantSchemas res
-  | otherwise = eliminateRedundantSchemas ((head canditateKeys, []) : res)
+  | any (\r -> any (`subset` fst r) canditateKeys) schemas = eliminateRedundantSchemas schemas
+  | otherwise = eliminateRedundantSchemas ((head canditateKeys, []) : schemas)
   where
     canditateKeys = getCandidateKeys r
-    res = splitIntoSchemas $ canonicalCover r
-    eliminateRedundantSchemas [] = []
-    eliminateRedundantSchemas ((xs, ys) : schemas)
-      | any (\(attrs, _) -> xs `subset` attrs) schemas = eliminateRedundantSchemas schemas
-      | otherwise  = (xs, ys) : schemas
+    schemas = splitIntoSchemas $ canonicalCover r
+
+eliminateRedundantSchemas :: [Relation] -> [Relation]
+eliminateRedundantSchemas [] = []
+eliminateRedundantSchemas (r@(attrs, _) : schemas)
+  | any (subset attrs . fst) schemas = eliminateRedundantSchemas schemas
+  | otherwise = r : eliminateRedundantSchemas schemas
 
 splitIntoSchemas :: Relation -> [Relation]
-splitIntoSchemas (_, fds) = map (addFds fds) $ split fds
+splitIntoSchemas (_, fds) = map (`addMatchingDependencies` fds) $ split fds
   where
     split [] = []
     split (fd@(FD xs ys) : fds) = (xs ++ ys, [fd]) : split fds
+    split (MVD _ _ : _) = undefined 
 
+addMatchingDependencies :: Relation -> [Dependency] -> Relation
+addMatchingDependencies = foldr (\fd (attrs, fds) -> if (alpha fd ++ beta fd) `subset` attrs && fd `notElem` fds then (attrs, fd : fds) else (attrs, fds))
 
-addFds :: [Dependency] -> Relation -> Relation
-addFds [] r = r
-addFds (fd@(FD xs ys) : fds) (attrs', fds')
-  | (xs ++ ys) `subset` attrs' && fd `notElem` fds' = addFds fds (attrs', fd : fds')
-  | otherwise = addFds fds (attrs', fds')
+-- addFds :: [Dependency] -> Relation -> Relation
+-- addFds [] r = r
+-- addFds (fd@(FD xs ys) : fds) (attrs', fds')
+--   | (xs ++ ys) `subset` attrs' && fd `notElem` fds' = addFds fds (attrs', fd : fds')
+--   | otherwise = addFds fds (attrs', fds')
 
 canonicalCover :: Relation -> Relation
 canonicalCover = uniteFDs . removeEmptyFDs . rightReduction . leftReduction
@@ -160,44 +165,42 @@ uniteFDs r@(attrs, fds) = (attrs, go fds)
   where
     go [] = []
     go (mvd@(MVD _ _) : fds) = mvd : go fds
-    go (fd@(FD xs ys) : fds) = 
-      let
-        notUniteable = filter (not . predicate xs) recursiveCall
-        uniteable = map beta $ filter (predicate xs) recursiveCall
-        predicate as (FD bs cs) = setEqual as bs 
-        predicate _ (MVD bs cs) = False 
-        recursiveCall = go fds 
-      in if null uniteable then fd : recursiveCall else FD xs (ys ++ concat uniteable) : notUniteable
+    go (fd@(FD xs ys) : fds) =
+      let notUniteable = filter (not . predicate xs) recursiveCall
+          uniteable = map beta $ filter (predicate xs) recursiveCall
+          predicate as (FD bs cs) = setEqual as bs
+          predicate _ (MVD bs cs) = False
+          recursiveCall = go fds
+       in if null uniteable then fd : recursiveCall else FD xs (ys ++ concat uniteable) : notUniteable
 
 leftReduction :: Relation -> Relation
-leftReduction (attrs, fds) = (attrs, go [] fds)
+leftReduction = reduce leftReduceFD
+
+rightReduction :: Relation -> Relation
+rightReduction = reduce rightReduceFD
+
+reduce :: (Dependency -> [Dependency] -> Dependency) -> Relation -> Relation
+reduce f (attrs, fds) = (attrs, go [] fds)
   where
     go acc [] = acc
-    go acc (d@(FD xs ys) : fds) = go (leftReduceFD d (acc ++ fds) : acc) fds
+    go acc (d@(FD xs ys) : fds) = go (f d (acc ++ fds) : acc) fds
     go acc (d@(MVD xs ys) : fds) = go acc fds
 
-leftReduceFD :: Dependency -> [Dependency] -> Dependency 
+leftReduceFD :: Dependency -> [Dependency] -> Dependency
 leftReduceFD (MVD _ _) _ = undefined
 leftReduceFD (FD xs ys) fds = FD (go xs []) ys
   where
     go [] acc = acc
-    go (x:xs) acc
-      | ys `subset` closure (acc ++ xs) (FD (acc ++ (x:xs)) ys : fds) = go xs acc
+    go (x : xs) acc
+      | ys `subset` closure (acc ++ xs) (FD (acc ++ (x : xs)) ys : fds) = go xs acc
       | otherwise = go xs (x : acc)
-
-rightReduction :: Relation -> Relation
-rightReduction (attrs, fds) = (attrs, go [] fds)
-  where
-    go acc [] = acc
-    go acc (d@(FD xs ys) : fds) = go (rightReduceFD d (acc ++ fds) : acc) fds
-    go acc (d@(MVD xs ys) : fds) = go acc fds
 
 rightReduceFD :: Dependency -> [Dependency] -> Dependency
 rightReduceFD (MVD _ _) _ = undefined
-rightReduceFD (FD xs ys) fds = FD xs (go ys []) 
+rightReduceFD (FD xs ys) fds = FD xs (go ys [])
   where
     go [] acc = acc
-    go (y:ys) acc
+    go (y : ys) acc
       | y `elem` closure xs (FD xs (acc ++ ys) : fds) = go ys acc
       | otherwise = go ys (y : acc)
 
